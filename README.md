@@ -1,5 +1,7 @@
 # Orator SSL Proxy
 
+> **[&#9654; Read the Orator-Ssl-Proxy Documentation](https://stevenvelozo.github.io/orator-ssl-proxy/)** &mdash; interactive docs with the full API reference.
+
 > SSL-terminating reverse proxy with host-based routing, local CA, and Let's Encrypt support
 
 Orator SSL Proxy is a Fable service provider that puts HTTPS in front of any set of backend services. It terminates TLS on an HTTPS port, dispatches incoming requests to different backends based on the `Host` header, forwards WebSocket upgrades, and manages certificates automatically with pluggable strategies -- a trusted local CA for dev and home networks, Let's Encrypt for production, or user-supplied PEM files when you already have certificates.
