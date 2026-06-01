@@ -89,6 +89,6 @@ npx orator-ssl-proxy cert-install-root-ca   # one-time trust install
 - [orator-http-proxy](https://fable-retold.github.io/orator-http-proxy/) - Path-based HTTP proxy for Orator applications
 - [orator-serviceserver-restify](https://fable-retold.github.io/orator-serviceserver-restify/) - Restify service server implementation
 - [orator-static-server](https://fable-retold.github.io/orator-static-server/) - Static file serving with subdomain routing
-- [orator-authentication](https://github.com/fable-retold/orator-authentication) - Cookie-based sessions and OAuth
+- [orator-authentication](https://fable-retold.github.io/orator-authentication/) - Cookie-based sessions and OAuth
 - [fable](https://fable-retold.github.io/fable/) - Service provider framework
 - [pict-service-commandlineutility](https://fable-retold.github.io/pict-service-commandlineutility/) - CLI framework used by the `orator-ssl-proxy` bin
