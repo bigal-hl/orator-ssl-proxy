@@ -1,0 +1,26 @@
+sequenceDiagram
+    participant Boot as Proxy.start()
+    participant Strategy as CertStrategy
+    participant Store as CertStore
+    participant Timer as Renewal Timer
+    participant Server as HTTPS Server
+
+    Boot->>Strategy: provision(fCallback)
+    Strategy->>Strategy: loadOrGenerate CA and leaves
+    Strategy->>Store: updateContext(host, key, cert, ca)
+    Store-->>Strategy: ok
+    Strategy-->>Boot: fCallback(null)
+    Boot->>Server: listen(port)
+    Boot->>Timer: setInterval(checkAndRenew, 12h)
+
+    loop every 12 hours
+        Timer->>Strategy: checkAndRenew(fCallback)
+        Strategy->>Strategy: inspect cached cert expiry
+        alt needs renewal
+            Strategy->>Strategy: re-issue cert
+            Strategy->>Store: updateContext(host, newKey, newCert, ca)
+        end
+        Strategy-->>Timer: fCallback(null)
+    end
+
+    Note over Server,Store: In-flight handshakes<br/>always read the current<br/>cert store -- no restart needed

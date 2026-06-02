@@ -1,0 +1,18 @@
+flowchart LR
+    A[~/.orator-ssl.config.json]
+    B[./.orator-ssl.config.json]
+    C[./.config/.orator-ssl.config.json]
+    D[CLI Flags]
+    E[Pict CLI Chain Loader]
+    F[Configuration-Loader.normalise]
+    G[Configuration-Loader.validate]
+    H[Resolved Configuration]
+
+    A --> E
+    B --> E
+    C --> E
+    E --> F
+    D --> F
+    F --> G
+    G --> H
+    H --> I[OratorSSLProxy]

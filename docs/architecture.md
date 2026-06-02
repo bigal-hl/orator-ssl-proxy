@@ -38,33 +38,8 @@ A deliberate design decision: traffic dispatched through the proxy **does not** 
 
 ## Request Lifecycle
 
-```mermaid
-sequenceDiagram
-    participant Client
-    participant HTTPSServer as HTTPS Server<br/>(Node https)
-    participant SNI as SNI Callback
-    participant Store as CertStore
-    participant Router as HostRouter
-    participant Dispatcher as BackendDispatcher
-    participant Proxy as http-proxy
-    participant Backend
-
-    Client->>HTTPSServer: ClientHello (SNI: app-a.test)
-    HTTPSServer->>SNI: SNICallback('app-a.test', cb)
-    SNI->>Store: getSecureContext('app-a.test')
-    Store-->>SNI: SecureContext (exact match)
-    SNI-->>HTTPSServer: cb(null, context)
-    HTTPSServer->>Client: TLS handshake complete
-    Client->>HTTPSServer: GET /foo (Host: app-a.test)
-    HTTPSServer->>Router: resolve('app-a.test')
-    Router->>Router: exact -> wildcard -> default lookup
-    Router-->>HTTPSServer: { host, target: 'http://127.0.0.1:8086' }
-    HTTPSServer->>Dispatcher: dispatchWeb(req, res, routeEntry)
-    Dispatcher->>Proxy: proxy.web(req, res, { target, xfwd: true, ... })
-    Proxy->>Backend: GET /foo (X-Forwarded-Host: app-a.test)
-    Backend-->>Proxy: 200 OK
-    Proxy-->>Client: 200 OK (streaming)
-```
+<!-- bespoke diagram: edit diagrams/request-lifecycle.mmd or .hints.json, then: npx pict-renderer-graph build modules/orator/orator-ssl-proxy/docs -->
+![Request Lifecycle](diagrams/request-lifecycle.svg)
 
 The router's resolution order is:
 
@@ -75,25 +50,8 @@ The router's resolution order is:
 
 ## WebSocket Upgrades
 
-```mermaid
-sequenceDiagram
-    participant Client
-    participant HTTPSServer as HTTPS Server
-    participant Router as HostRouter
-    participant Dispatcher as BackendDispatcher
-    participant Proxy as http-proxy
-    participant Backend
-
-    Client->>HTTPSServer: TLS + Upgrade: websocket (Host: app-a.test)
-    HTTPSServer->>HTTPSServer: emit 'upgrade' event
-    HTTPSServer->>Router: resolve('app-a.test')
-    Router-->>HTTPSServer: route entry (ws: true)
-    HTTPSServer->>Dispatcher: dispatchWs(req, socket, head, routeEntry)
-    Dispatcher->>Proxy: proxy.ws(req, socket, head, { target, ws: true })
-    Proxy->>Backend: upgrade connection
-    Backend-->>Proxy: 101 Switching Protocols
-    Proxy-->>Client: bidirectional stream
-```
+<!-- bespoke diagram: edit diagrams/websocket-upgrades.mmd or .hints.json, then: npx pict-renderer-graph build modules/orator/orator-ssl-proxy/docs -->
+![WebSocket Upgrades](diagrams/websocket-upgrades.svg)
 
 The router is the same. The dispatcher calls `proxy.ws()` instead of `proxy.web()`. Routes can opt out of WebSocket forwarding per-entry with `"ws": false`.
 
@@ -101,34 +59,8 @@ The router is the same. The dispatcher calls `proxy.ws()` instead of `proxy.web(
 
 The cert store is a mutable `Map<hostname, SecureContext>` keyed by exact hostname, with a sorted wildcard list and a single `*` default. The SNI callback reads the store on every TLS handshake, so strategies that renew certs in the background (Let's Encrypt, periodic self-signed regeneration) can swap entries live without restarting the listening socket.
 
-```mermaid
-sequenceDiagram
-    participant Boot as Proxy.start()
-    participant Strategy as CertStrategy
-    participant Store as CertStore
-    participant Timer as Renewal Timer
-    participant Server as HTTPS Server
-
-    Boot->>Strategy: provision(fCallback)
-    Strategy->>Strategy: loadOrGenerate CA and leaves
-    Strategy->>Store: updateContext(host, key, cert, ca)
-    Store-->>Strategy: ok
-    Strategy-->>Boot: fCallback(null)
-    Boot->>Server: listen(port)
-    Boot->>Timer: setInterval(checkAndRenew, 12h)
-
-    loop every 12 hours
-        Timer->>Strategy: checkAndRenew(fCallback)
-        Strategy->>Strategy: inspect cached cert expiry
-        alt needs renewal
-            Strategy->>Strategy: re-issue cert
-            Strategy->>Store: updateContext(host, newKey, newCert, ca)
-        end
-        Strategy-->>Timer: fCallback(null)
-    end
-
-    Note over Server,Store: In-flight handshakes<br/>always read the current<br/>cert store -- no restart needed
-```
+<!-- bespoke diagram: edit diagrams/cert-strategies-and-sni.mmd or .hints.json, then: npx pict-renderer-graph build modules/orator/orator-ssl-proxy/docs -->
+![Cert Strategies and SNI](diagrams/cert-strategies-and-sni.svg)
 
 ## Local CA Design (selfsigned / localCA)
 
@@ -145,41 +77,8 @@ This is the same pattern popularized by [`mkcert`](https://github.com/FiloSottil
 
 When the `letsencrypt` strategy is active:
 
-```mermaid
-sequenceDiagram
-    participant Boot as Proxy.start()
-    participant LE as LetsEncrypt Strategy
-    participant Store as CertStore
-    participant ACME as acme-client
-    participant HTTP80 as HTTP:80 Listener
-    participant Store80 as ACMEChallengeStore
-    participant LetsEncrypt as Let's Encrypt
-
-    Boot->>HTTP80: bind port 80
-    Boot->>LE: provision(hostnames)
-    alt bootstrapWithSelfSigned
-        LE->>LE: generate placeholder self-signed
-        LE->>Store: updateContext(host, placeholder)
-    end
-    LE->>LE: load or create account.key
-    LE->>ACME: new Client({ directoryUrl, accountKey })
-    loop for each hostname
-        LE->>ACME: client.auto({ csr, email, challengePriority: ['http-01'], challengeCreateFn, challengeRemoveFn })
-        ACME->>Store80: challengeCreateFn(token, keyAuth)
-        ACME->>LetsEncrypt: request authorization + finalize order
-        LetsEncrypt->>HTTP80: GET /.well-known/acme-challenge/<token>
-        HTTP80->>Store80: lookup(token)
-        Store80-->>HTTP80: keyAuth
-        HTTP80-->>LetsEncrypt: 200 OK keyAuth
-        LetsEncrypt-->>ACME: cert chain
-        ACME->>Store80: challengeRemoveFn(token)
-        ACME-->>LE: cert PEM
-        LE->>LE: persist key + cert to {storagePath}/letsencrypt/
-        LE->>Store: updateContext(host, key, cert)
-    end
-    LE-->>Boot: provision complete
-    Note over Store,HTTP80: Self-signed placeholder<br/>is now replaced with<br/>real Let's Encrypt cert
-```
+<!-- bespoke diagram: edit diagrams/let-s-encrypt-flow-selfsigned-real.mmd or .hints.json, then: npx pict-renderer-graph build modules/orator/orator-ssl-proxy/docs -->
+![Let's Encrypt Flow (selfsigned -> real)](diagrams/let-s-encrypt-flow-selfsigned-real.svg)
 
 Port 80 **must** be reachable from the public internet for HTTP-01 to complete. Staging is the default (`certs.letsencrypt.staging: true`) so repeated dev runs don't hit production rate limits. Flip to production only after verifying the flow end-to-end.
 
@@ -187,26 +86,8 @@ Renewals piggyback on the same 12-hour timer as the self-signed strategy. A cach
 
 ## Configuration Flow
 
-```mermaid
-flowchart LR
-    A[~/.orator-ssl.config.json]
-    B[./.orator-ssl.config.json]
-    C[./.config/.orator-ssl.config.json]
-    D[CLI Flags]
-    E[Pict CLI Chain Loader]
-    F[Configuration-Loader.normalise]
-    G[Configuration-Loader.validate]
-    H[Resolved Configuration]
-
-    A --> E
-    B --> E
-    C --> E
-    E --> F
-    D --> F
-    F --> G
-    G --> H
-    H --> I[OratorSSLProxy]
-```
+<!-- bespoke diagram: edit diagrams/configuration-flow.mmd or .hints.json, then: npx pict-renderer-graph build modules/orator/orator-ssl-proxy/docs -->
+![Configuration Flow](diagrams/configuration-flow.svg)
 
 `pict-service-commandlineutility` provides the multi-folder loader for free, including the `explain-config` mixin command. The configuration loader deep-merges those files over the built-in defaults, expands `~` in paths, resolves null ports to hashed defaults, normalises route entries, and validates the final shape before handing it to the service provider.
 

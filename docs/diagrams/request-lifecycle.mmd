@@ -1,0 +1,25 @@
+sequenceDiagram
+    participant Client
+    participant HTTPSServer as HTTPS Server<br/>(Node https)
+    participant SNI as SNI Callback
+    participant Store as CertStore
+    participant Router as HostRouter
+    participant Dispatcher as BackendDispatcher
+    participant Proxy as http-proxy
+    participant Backend
+
+    Client->>HTTPSServer: ClientHello (SNI: app-a.test)
+    HTTPSServer->>SNI: SNICallback('app-a.test', cb)
+    SNI->>Store: getSecureContext('app-a.test')
+    Store-->>SNI: SecureContext (exact match)
+    SNI-->>HTTPSServer: cb(null, context)
+    HTTPSServer->>Client: TLS handshake complete
+    Client->>HTTPSServer: GET /foo (Host: app-a.test)
+    HTTPSServer->>Router: resolve('app-a.test')
+    Router->>Router: exact -> wildcard -> default lookup
+    Router-->>HTTPSServer: { host, target: 'http://127.0.0.1:8086' }
+    HTTPSServer->>Dispatcher: dispatchWeb(req, res, routeEntry)
+    Dispatcher->>Proxy: proxy.web(req, res, { target, xfwd: true, ... })
+    Proxy->>Backend: GET /foo (X-Forwarded-Host: app-a.test)
+    Backend-->>Proxy: 200 OK
+    Proxy-->>Client: 200 OK (streaming)

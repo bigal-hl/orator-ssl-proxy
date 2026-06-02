@@ -1,0 +1,33 @@
+sequenceDiagram
+    participant Boot as Proxy.start()
+    participant LE as LetsEncrypt Strategy
+    participant Store as CertStore
+    participant ACME as acme-client
+    participant HTTP80 as HTTP:80 Listener
+    participant Store80 as ACMEChallengeStore
+    participant LetsEncrypt as Let's Encrypt
+
+    Boot->>HTTP80: bind port 80
+    Boot->>LE: provision(hostnames)
+    alt bootstrapWithSelfSigned
+        LE->>LE: generate placeholder self-signed
+        LE->>Store: updateContext(host, placeholder)
+    end
+    LE->>LE: load or create account.key
+    LE->>ACME: new Client({ directoryUrl, accountKey })
+    loop for each hostname
+        LE->>ACME: client.auto({ csr, email, challengePriority: ['http-01'], challengeCreateFn, challengeRemoveFn })
+        ACME->>Store80: challengeCreateFn(token, keyAuth)
+        ACME->>LetsEncrypt: request authorization + finalize order
+        LetsEncrypt->>HTTP80: GET /.well-known/acme-challenge/<token>
+        HTTP80->>Store80: lookup(token)
+        Store80-->>HTTP80: keyAuth
+        HTTP80-->>LetsEncrypt: 200 OK keyAuth
+        LetsEncrypt-->>ACME: cert chain
+        ACME->>Store80: challengeRemoveFn(token)
+        ACME-->>LE: cert PEM
+        LE->>LE: persist key + cert to {storagePath}/letsencrypt/
+        LE->>Store: updateContext(host, key, cert)
+    end
+    LE-->>Boot: provision complete
+    Note over Store,HTTP80: Self-signed placeholder<br/>is now replaced with<br/>real Let's Encrypt cert
