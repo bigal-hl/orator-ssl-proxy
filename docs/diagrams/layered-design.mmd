@@ -1,0 +1,6 @@
+graph TD
+    Fable["Fable<br/>(Configuration, Logging, DI)"] --> SSLProxy["OratorSSLProxy<br/>(Service Provider Lifecycle, Orchestration)"]
+    SSLProxy --> HTTPS["HTTPS Server Factory"]
+    SSLProxy --> HTTP["HTTP Server Factory"]
+    SSLProxy --> HostRouter["HostRouter + BackendDispatcher"]
+    SSLProxy --> CertStore["CertStore + Strategy<br/>(Self/LE)"]

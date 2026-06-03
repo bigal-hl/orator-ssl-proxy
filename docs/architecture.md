@@ -4,23 +4,8 @@ Orator SSL Proxy is built as a Fable service provider that wires together a hand
 
 ## Layered Design
 
-```
-┌─────────────────────────────────────────────┐
-│                   Fable                     │
-│        (Configuration, Logging, DI)         │
-└─────────────────────┬───────────────────────┘
-                      │
-┌─────────────────────▼───────────────────────┐
-│             OratorSSLProxy                  │
-│  (Service Provider Lifecycle, Orchestration)│
-└───┬────────┬──────────┬────────────┬────────┘
-    │        │          │            │
-┌───▼──┐ ┌───▼──┐ ┌─────▼──────┐ ┌───▼──────┐
-│ HTTPS│ │ HTTP │ │HostRouter  │ │CertStore │
-│Server│ │Server│ │+ BackendDis│ │+ Strategy│
-│Factory│ │Factory││patcher    │ │ (Self/LE)│
-└──────┘ └──────┘ └────────────┘ └──────────┘
-```
+<!-- bespoke diagram: edit diagrams/layered-design.mmd or .hints.json, then: npx pict-renderer-graph build modules/orator/orator-ssl-proxy/docs -->
+![Layered Design](diagrams/layered-design.svg)
 
 - **Fable** provides the service provider base, logging, and configuration primitives.
 - **OratorSSLProxy** is the top-level orchestrator: reads config, builds everything, starts the servers, stops them gracefully.
